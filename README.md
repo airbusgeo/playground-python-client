@@ -1,6 +1,6 @@
 # Jupyter Notebooks examples of Playground API scripts
 
-## Connecting to the API
+## Get and store your API key
 
 To connect to the API, you need to retrieve your API_KEYS from the OneAtlas website. Follow the simple steps below:
 
@@ -12,3 +12,21 @@ To connect to the API, you need to retrieve your API_KEYS from the OneAtlas webs
 Make sure to keep your **api_key.txt** safe! Do not include it in a public github repository for example :-)
 
 The following script will then use this **api_key.txt** file to generate an ACCESS_TOKEN. We will store this ACCESS_TOKEN in HEADERS that we will send with each requests. The ACCESS_TOKEN has a timeout so we will create a function that renew the ACCESS_TOKEN when half of the timeout has expired. 
+
+## Create the Python Playground Client
+
+Just import and create an instance of the PlaygroundClient object:
+
+```
+# Connect to the Playground API 
+from playgroundclient import PlaygroundClient
+play = PlaygroundClient()
+```
+
+You can start using the client immediately:
+
+```
+# Logged in user
+user = play.get_logged_user()
+print("Logged as user: {} {}".format(user['firstname'], user['lastname']))
+```
