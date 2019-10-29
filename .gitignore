@@ -9,6 +9,9 @@ __pycache__/
 # OneAtlas API Key
 *.txt
 
+# Legacy
+legacy
+
 # Distribution / packaging
 .Python
 build/
