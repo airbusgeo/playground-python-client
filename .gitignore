@@ -8,6 +8,7 @@ __pycache__/
 
 # OneAtlas API Key
 *.txt
+ZZ*
 
 # Legacy
 legacy

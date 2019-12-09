@@ -11,7 +11,6 @@ import math
 from PIL import Image
 import os.path
 
-
 IMG_MODE = 'RGB'
 IMG_SIDE = 256
 
