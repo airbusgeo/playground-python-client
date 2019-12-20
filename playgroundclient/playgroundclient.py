@@ -183,7 +183,7 @@ class PlaygroundClient(object):
     def get_zone(self, zoneId):
         return self._get_request(self.PLAYGROUND_ZONE_URL, zoneId=zoneId)
     def store_zone(self, zoneId, zone):
-        return self._put_request(self.PLAYGROUND_ZONE_URL, zoneId=zoneId, data=json.dumps(zone))
+        return self._put_request(self.PLAYGROUND_ZONE_URL, payload=json.dumps(zone), zoneId=zoneId)
 
     RECORDS_COUNT_ZONE_URL = PLAYGROUND_URL + "/api/records?count=true&zone_id={zoneId}&bbox={BBOX}"
     def get_records_count_in_zone(self, zoneId, bbox):
