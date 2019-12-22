@@ -48,10 +48,10 @@ class PlaygroundClient(object):
     HEADERS = None
     
     # Official Playground URL
-    #PLAYGROUND_URL = "https://playground.intelligence-airbusds.com"
+    PLAYGROUND_URL = "https://playground.intelligence-airbusds.com"
 
     # Alternate Playground URL
-    PLAYGROUND_URL = "https://apps.playground.airbusds-geo.com"
+    #PLAYGROUND_URL = "https://apps.playground.airbusds-geo.com"
 
 
     # The class "constructor" - It's actually an initializer 
@@ -125,6 +125,19 @@ class PlaygroundClient(object):
             raise PlaygroundClientError(r.status_code, 'A problem occured during connection with the Playground')
         return None
 
+    def _post_request(self, template, payload, **kwargs):
+        self.playground_refresh_access_token()
+        r = requests.post(template.format(**kwargs), data=payload, headers=self.HEADERS)
+        if r.status_code == 200:
+            return r.json()
+        elif r.status_code == 404:
+            raise PlaygroundClientError(r.status_code, 'This object does not exist')
+        elif r.status_code == 401 or r.status_code == 403:
+            raise PlaygroundClientError(r.status_code, 'You do not have sufficient rights to perform this operation')
+        else:
+            raise PlaygroundClientError(r.status_code, 'A problem occured during connection with the Playground')
+        return None
+
     def _put_request(self, template, payload, **kwargs):
         self.playground_refresh_access_token()
         r = requests.put(template.format(**kwargs), data=payload, headers=self.HEADERS)
@@ -180,12 +193,12 @@ class PlaygroundClient(object):
         return self._get_request(self.PLAYGROUND_ZONES_SEARCH_URL, datasetId=datasetId)
 
     PLAYGROUND_ZONE_ID_URL = PLAYGROUND_URL + "/api/zones/{zoneId}"
-    PLAYGROUND_ZONE_URL = PLAYGROUND_URL + "/api/zones/"
+    PLAYGROUND_ZONE_URL = PLAYGROUND_URL + "/api/zones"
     def get_zone(self, zoneId):
         return self._get_request(self.PLAYGROUND_ZONE_ID_URL, zoneId=zoneId)
     def store_zone(self, zone, zoneId=None):
         if zoneId == None:
-            return self._put_request(self.PLAYGROUND_ZONE_URL, payload=json.dumps(zone))
+            return self._post_request(self.PLAYGROUND_ZONE_URL, payload=json.dumps(zone))
         else:
             return self._put_request(self.PLAYGROUND_ZONE_ID_URL, payload=json.dumps(zone), zoneId=zoneId)
 
