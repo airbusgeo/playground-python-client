@@ -179,11 +179,15 @@ class PlaygroundClient(object):
     def get_zones_in_dataset(self, datasetId):
         return self._get_request(self.PLAYGROUND_ZONES_SEARCH_URL, datasetId=datasetId)
 
-    PLAYGROUND_ZONE_URL = PLAYGROUND_URL + "/api/zones/{zoneId}"
+    PLAYGROUND_ZONE_ID_URL = PLAYGROUND_URL + "/api/zones/{zoneId}"
+    PLAYGROUND_ZONE_URL = PLAYGROUND_URL + "/api/zones/"
     def get_zone(self, zoneId):
-        return self._get_request(self.PLAYGROUND_ZONE_URL, zoneId=zoneId)
-    def store_zone(self, zoneId, zone):
-        return self._put_request(self.PLAYGROUND_ZONE_URL, payload=json.dumps(zone), zoneId=zoneId)
+        return self._get_request(self.PLAYGROUND_ZONE_ID_URL, zoneId=zoneId)
+    def store_zone(self, zone, zoneId=None):
+        if zoneId not None:
+            return self._put_request(self.PLAYGROUND_ZONE_ID_URL, payload=json.dumps(zone), zoneId=zoneId)
+        else:
+            return self._put_request(self.PLAYGROUND_ZONE_URL, payload=json.dumps(zone))
 
     RECORDS_COUNT_ZONE_URL = PLAYGROUND_URL + "/api/records?count=true&zone_id={zoneId}&bbox={BBOX}"
     def get_records_count_in_zone(self, zoneId, bbox):
@@ -224,11 +228,11 @@ class PlaygroundClient(object):
         elif r.status_code == 401 or r.status_code == 403:
             raise PlaygroundClientError(r.status_code, 'You do not have sufficient rights to perform this operation')
         else:
-            raise PlaygroundClientError(r.status_code, 'A problem occured during connection with the Playground')
+            raise TileException(r.status_code, 'A problem occured while retreiving tile from Playground')
         return None    
     
     # multithreaded functions to get multiple XYZ tiles and combine them into a large tile
-    def get_big_tile(self, nbtiles, xyz_url, zoom, col, row):
+    def get_big_tile(self, nbtiles, xyz_url, zoom, col, row, num_worker_threads = 8):
         big_tile = Image.new(IMG_MODE, (IMG_SIDE * nbtiles, IMG_SIDE * nbtiles))
         offset = nbtiles // 2
 
@@ -247,7 +251,7 @@ class PlaygroundClient(object):
                 r = row - offset + j
                 try:
                     img = self.get_tile(xyz_url, zoom, c, r)
-                except (TileException, NetException) as te:
+                except (TileException) as te:
                     print("In except clause: putting {}/{} back in queue".format(j, i))
                     q.put(args)
                     continue
@@ -268,7 +272,6 @@ class PlaygroundClient(object):
             q.put(p)
 
         threads = []
-        num_worker_threads = 8
         for _ in range(num_worker_threads):
             t = Thread(target=patchwork, args=(q,))
             t.start()
