@@ -233,7 +233,11 @@ class PlaygroundClient(object):
     # function to get a single XYZ tile
     def get_tile(self, xyz_url, z, x, y):
         self.playground_refresh_access_token()
-        r = requests.get(xyz_url.format(z=z, x=x, y=y), headers=self.HEADERS)
+        try:
+            r = requests.get(xyz_url.format(z=z, x=x, y=y), headers=self.HEADERS)
+        except Exception as e:
+            raise NetException('A problem occured while while connecting to the Tile service: ' + str(e))
+
         if r.status_code == 200:
             return Image.open(BytesIO(r.content))
         elif r.status_code == 404 or r.status_code == 204:
@@ -264,8 +268,9 @@ class PlaygroundClient(object):
                 r = row - offset + j
                 try:
                     img = self.get_tile(xyz_url, zoom, c, r)
-                except (TileException) as te:
-                    print("In except clause: putting {}/{} back in queue".format(j, i))
+                except (NetException, TileException) as e:
+                    print("Catched an error: " + str(e))
+                    print("==> Putting {}/{} back in queue.".format(j, i))
                     q.put(args)
                     continue
                 finally:
@@ -294,7 +299,7 @@ class PlaygroundClient(object):
         q.join()
 
         # stop workers
-        for i in range(num_worker_threads):
+        for _ in range(num_worker_threads):
             q.put(None)
         for t in threads:
             t.join()
