@@ -201,6 +201,9 @@ class PlaygroundClient(object):
             return self._post_request(self.PLAYGROUND_ZONE_URL, payload=json.dumps(zone))
         else:
             return self._put_request(self.PLAYGROUND_ZONE_ID_URL, payload=json.dumps(zone), zoneId=zoneId)
+    def delete_zone(self, zoneId):
+        return self._delete_request(self.PLAYGROUND_ZONE_ID_URL, zoneId=zoneId)
+
 
     RECORDS_COUNT_ZONE_URL = PLAYGROUND_URL + "/api/records?count=true&zone_id={zoneId}&bbox={BBOX}"
     def get_records_count_in_zone(self, zoneId, bbox):
@@ -245,7 +248,7 @@ class PlaygroundClient(object):
         elif r.status_code == 401 or r.status_code == 403:
             raise PlaygroundClientError(r.status_code, 'You do not have sufficient rights to perform this operation')
         else:
-            raise TileException(r.status_code, 'A problem occured while retreiving tile from Playground')
+            raise TileException(r.status_code, 'A problem occured while retrieving tile from Playground')
         return None    
     
     # multithreaded functions to get multiple XYZ tiles and combine them into a large tile
@@ -257,6 +260,8 @@ class PlaygroundClient(object):
         queueLock = Lock()
 
         def patchwork(q):
+            counter = 0
+            max_retries = 20
             while True:
                 args = q.get()
                 if args is None:
@@ -270,9 +275,13 @@ class PlaygroundClient(object):
                     img = self.get_tile(xyz_url, zoom, c, r)
                 except (NetException, TileException) as e:
                     print("Catched an error: " + str(e))
-                    print("==> Putting {}/{} back in queue.".format(j, i))
-                    q.put(args)
-                    continue
+                    if counter < max_retries:
+                        print("==> Putting {}/{} back in queue.".format(j, i))
+                        q.put(args)
+                        counter += 1
+                        continue
+                    else:
+                        raise e
                 finally:
                     q.task_done()
 
