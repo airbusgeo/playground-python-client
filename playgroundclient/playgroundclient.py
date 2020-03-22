@@ -281,10 +281,18 @@ class PlaygroundClient(object):
                         counter += 1
                         continue
                     else:
+                        # there is an error and we try enough times
+                        # empty the queue
+                        while True:
+                            q.task_done()
+                            args = q.get()
+                            if args is None:
+                                break
                         raise e
                 finally:
                     q.task_done()
 
+                counter = 0
                 # paste in big image making sure that it is thread-safe
                 queueLock.acquire()
                 big_tile.paste(img, (i * IMG_SIDE, j * IMG_SIDE))
