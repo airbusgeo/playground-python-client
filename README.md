@@ -10,6 +10,8 @@ First clone this repository:
 
 Then open a command shell, go to the repository folder and type the following command:
 ```pip install .```
+or if your have already installed the client and want to upgrade:
+```pip install --upgrade .```
 
 This will install the Playground API Client in your local Python libraries.
 

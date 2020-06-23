@@ -14,6 +14,16 @@ import os.path
 IMG_MODE = 'RGB'
 IMG_SIDE = 256
 
+# http://www.neercartography.com/latitudelongitude-tofrom-web-mercator/
+# http://www.maptiler.org/google-maps-coordinates-tile-bounds-projection/
+
+# WGS84 spheriod semimajor axis
+SEMI_MAJOR_AXIS = 6378137.0
+
+# maxvalue = 2 * math.pi * 6378137.0 / 2.0
+MAX_VALUE = 20037508.342789244
+
+
 class NetException(Exception):
     """Tile Exception: generic error for Internet"""
     def __init__(self, message):
@@ -204,19 +214,35 @@ class PlaygroundClient(object):
     def delete_zone(self, zoneId):
         return self._delete_request(self.PLAYGROUND_ZONE_ID_URL, zoneId=zoneId)
 
-
-    RECORDS_COUNT_ZONE_URL = PLAYGROUND_URL + "/api/records?count=true&zone_id={zoneId}&bbox={BBOX}"
+    PLAYGROUND_RECORDS_COUNT_ZONE_URL = PLAYGROUND_URL + "/api/records?count=true&zone_id={zoneId}&bbox={BBOX}"
     def get_records_count_in_zone(self, zoneId, bbox):
-        return self._get_request(self.RECORDS_COUNT_ZONE_URL, zoneId=zoneId, BBOX=bbox)
+        return self._get_request(self.PLAYGROUND_RECORDS_COUNT_ZONE_URL, zoneId=zoneId, BBOX=bbox)
 
-    RECORDS_ZONE_URL = PLAYGROUND_URL + "/api/records?zone_id={zoneId}&bbox={BBOX}"
+    PLAYGROUND_RECORDS_ZONE_URL = PLAYGROUND_URL + "/api/records?zone_id={zoneId}&bbox={BBOX}"
     def get_records_in_zone(self, zoneId, bbox):
-        return self._get_request(self.RECORDS_ZONE_URL, zoneId=zoneId, BBOX=bbox)
+        return self._get_request(self.PLAYGROUND_RECORDS_ZONE_URL, zoneId=zoneId, BBOX=bbox)
 
-    RECORDS_URL = PLAYGROUND_URL + "/api/records/{recordId}"
+    PLAYGROUND_RECORD_URL = PLAYGROUND_URL + "/api/records/{recordId}"
+    def store_record(self, record, recordId=None):
+        if recordId == None:
+            return self._post_request(self.PLAYGROUND_RECORD_URL, payload=json.dumps(record))
+        else:
+            return self._put_request(self.PLAYGROUND_RECORD_URL, payload=json.dumps(record), recordId=recordId)
     def delete_record(self, recordId):
-        return self._delete_request(self.RECORDS_URL, recordId=recordId)
-
+        return self._delete_request(self.PLAYGROUND_RECORD_URL, recordId=recordId)
+    
+    PLAYGROUND_RECORDS_STORE_URL = PLAYGROUND_URL + "/api/records"
+    def store_records(self, payload):
+        return self._post_request(self.PLAYGROUND_RECORDS_STORE_URL, payload=payload)
+    
+    PLAYGROUND_RECORDS_BATCH_DELETE_URL = PLAYGROUND_URL + "/api/recordsbatch/{batchId}/from_dataset/{datasetId}"
+    def delete_batch_records(self, datasetId, batchId):
+        return self._delete_request(self.PLAYGROUND_RECORDS_BATCH_DELETE_URL, datasetId=datasetId, batchId=batchId)
+    
+    PLAYGROUND_TAGS_URL = "https://playground.intelligence-airbusds.com/api/datasets/{datasetId}/tags"
+    def get_tags(self, datasetId):
+        return self._get_request(self.PLAYGROUND_TAGS_URL, datasetId=datasetId)
+    
     PLAYGROUND_CURRENT_SENSORS_URL = PLAYGROUND_URL + "/api/catalog/constellations"
     def check_available_sensors(self):
         return self._get_request(self.PLAYGROUND_CURRENT_SENSORS_URL)
@@ -232,6 +258,13 @@ class PlaygroundClient(object):
     PLAYGROUND_SEARCH_SOURCEID_URL = PLAYGROUND_URL + "/api/catalog/sourceid/{sourceId}"
     def get_image_from_sourceid(self, sourceId):
         return self._get_request(self.PLAYGROUND_SEARCH_SOURCEID_URL, sourceId=sourceId)
+
+    PLAYGROUND_JOB_URL = PLAYGROUND_URL + "/api/jobs"
+    PLAYGROUND_JOB_ID_URL = PLAYGROUND_URL + "/api/jobs/{jobId}"
+    def get_job(self, jobId):
+        return self._get_request(self.PLAYGROUND_JOB_ID_URL, jobId=jobId)
+    def launch_job(self, data):
+        return self._post_request(self.PLAYGROUND_JOB_URL, payload=json.dumps(data))
 
     # function to get a single XYZ tile
     def get_tile(self, xyz_url, z, x, y):
@@ -251,6 +284,14 @@ class PlaygroundClient(object):
             raise TileException(r.status_code, 'A problem occured while retrieving tile from Playground')
         return None    
     
+    @staticmethod
+    def emptyQueue(q):
+        while True:
+            q.task_done()
+            args = q.get()
+            if args is None:
+                break
+
     # multithreaded functions to get multiple XYZ tiles and combine them into a large tile
     def get_big_tile(self, nbtiles, xyz_url, zoom, col, row, num_worker_threads = 8):
         big_tile = Image.new(IMG_MODE, (IMG_SIDE * nbtiles, IMG_SIDE * nbtiles))
@@ -281,13 +322,11 @@ class PlaygroundClient(object):
                         counter += 1
                         continue
                     else:
-                        # there is an error and we try enough times
-                        # empty the queue
-                        while True:
-                            q.task_done()
-                            args = q.get()
-                            if args is None:
-                                break
+                        # there is an error and we've tried enough times
+                        emptyQueue(q)
+                        raise e
+                except (PlaygroundClientError) as e:
+                        emptyQueue(q)
                         raise e
                 finally:
                     q.task_done()
@@ -323,35 +362,91 @@ class PlaygroundClient(object):
 
         return big_tile
     
+    """
+    USEFUL GEOGRAPHICAL COMPUTATIONS
+    """
+
+    @staticmethod
+    def merc2num(easting, northing, zoom):
+        n = 2.0 ** zoom
+        xtile = int((easting / MAX_VALUE + 1.0) / 2.0 * n)
+        ytile = int((1.0 - northing / MAX_VALUE) / 2.0 * n)
+        return (xtile, ytile)
+
+    @staticmethod
+    def num2merc(xtile, ytile, zoom):
+        n = 2.0 ** zoom
+        easting = (2.0 * xtile / n - 1.0) * MAX_VALUE
+        northing = (1.0 - 2.0 * ytile / n) * MAX_VALUE
+        return (easting, northing)
+
+    @staticmethod
+    def merc2geog(easting, northing):
+
+        # Check if coordinate out of range for Web Mercator
+        # 20037508.342789244 is full extent of Web Mercator
+        if (abs(easting) > MAX_VALUE) or (abs(northing) > MAX_VALUE):
+            #raise ValueError
+            return float('NaN'), float('NaN')
+
+        latitude = (1.5707963267948966 - (2.0 * math.atan(math.exp((-1.0 * northing) / SEMI_MAJOR_AXIS)))) * (180.0 / math.pi)
+        longitude = ((easting / SEMI_MAJOR_AXIS) * 57.295779513082323) - ((math.floor((((easting / SEMI_MAJOR_AXIS) * 57.295779513082323) + 180.0) / 360.0)) * 360.0)
+
+        return longitude, latitude
+
+    @staticmethod
+    def geog2merc(lon, lat):
+        # Check if coordinate out of range for Latitude/Longitude
+        if (abs(lon) > 180.0) and (abs(lat) > 90.0):
+            return float('NaN'), float('NaN')
+
+        east = lon * 0.017453292519943295
+        north = lat * 0.017453292519943295
+
+        northing = 3189068.5 * math.log((1.0 + math.sin(north)) / (1.0 - math.sin(north)))
+        easting = SEMI_MAJOR_AXIS * east
+
+        return easting, northing
+
     # creates the corresponding PROJ file to the previous image
-    def get_big_tile_proj(self, nbtiles, zoom, col, row):
+    @staticmethod
+    def get_big_tile_proj(nbtiles, zoom, col, row):
 
         col_min = col - nbtiles // 2
         row_min = row - nbtiles // 2
 
-        (easting, northing) = num2merc(col_min, row_min, zoom)
-        content = str(2.0 * maxvalue / (2.0 ** zoom) / 256.0) + "\n"
+        (easting, northing) = PlaygroundClient.num2merc(col_min, row_min, zoom)
+        content = str(2.0 * MAX_VALUE / (2.0 ** zoom) / 256.0) + "\n"
         content += "0.0\n"
         content += "0.0\n"
-        content += str(-2.0 * maxvalue / (2.0 ** zoom) / 256.0) + "\n"
+        content += str(-2.0 * MAX_VALUE / (2.0 ** zoom) / 256.0) + "\n"
         content += str(easting) + "\n"
         content += str(northing) + "\n"
         return content
 
+    # function to convert pixels in a WebMercator JPEG image into lon/lat (using params from JGW)
+    @staticmethod
+    def pixel2geographic(px, py, param):
 
-    
-# some useful function to convert to WebMercator
-# maxvalue = 2 * math.pi * 6378137 / 2.0
-maxvalue = 20037508.342789244
+        # get easting,northing in WebMercator
+        easting = param[0] * px + param[2] * py + param[4]
+        northing = param[1] * px + param[3] * py + param[5]
 
-def merc2num(easting, northing, zoom):
-    n = 2.0 ** zoom
-    xtile = int((easting / maxvalue + 1.0) / 2.0 * n)
-    ytile = int((1.0 - northing / maxvalue) / 2.0 * n)
-    return (xtile, ytile)
+        # convert to lat,long
+        return PlaygroundClient.merc2geog(easting, northing)
 
-def num2merc(xtile, ytile, zoom):
-    n = 2.0 ** zoom
-    easting = (2.0 * xtile / n - 1.0) * maxvalue
-    northing = (1.0 - 2.0 * ytile / n) * maxvalue
-    return (easting, northing)
+
+    # function to convert lon/lat to pixels in a WebMercator JPEG image (using params from JGW)
+    @staticmethod
+    def geographic2pixel(lng, lat, param):
+
+        # convert to lat,long
+        easting, northing = PlaygroundClient.geog2merc(lng, lat)
+        #print(easting, northing)
+
+        # to pixels
+        x = (param[2] * (northing - param[5]) - param[3] * (easting - param[4])) / (param[1] * param[2] - param[0] * param[3])
+        y = (param[1] * (easting - param[4]) - param[0] * (northing - param[5])) / (param[1] * param[2] - param[0] * param[3])
+
+        return round(x), round(y)
+
