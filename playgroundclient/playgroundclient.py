@@ -63,6 +63,8 @@ class PlaygroundClient(object):
     # Alternate Playground URL
     #PLAYGROUND_URL = "https://apps.playground.airbusds-geo.com"
 
+    # Dict to store mapping between image_ids and xyz_url
+    uids_xyz = {}
 
     # The class "constructor" - It's actually an initializer 
     def __init__(self):
@@ -259,6 +261,16 @@ class PlaygroundClient(object):
     def get_image_from_sourceid(self, sourceId):
         return self._get_request(self.PLAYGROUND_SEARCH_SOURCEID_URL, sourceId=sourceId)
 
+    def get_image_xyz(self, imageUId):
+        if imageUId in self.uids_xyz:
+            return self.uids_xyz[imageUId]
+
+        r = self.get_image_from_uid(imageUId)
+        xyz_url = r['features'][0]['properties']['tileEngineUrl']
+        xyz_url = xyz_url.replace('cog.airbusds-geo.com', 'playground.intelligence-airbusds.com/api/cog')
+        self.uids_xyz[imageUId] = xyz_url
+        return xyz_url
+
     PLAYGROUND_JOB_URL = PLAYGROUND_URL + "/api/jobs"
     PLAYGROUND_JOB_ID_URL = PLAYGROUND_URL + "/api/jobs/{jobId}"
     def get_job(self, jobId):
@@ -267,7 +279,7 @@ class PlaygroundClient(object):
         return self._post_request(self.PLAYGROUND_JOB_URL, payload=json.dumps(data))
 
     # function to get a single XYZ tile
-    def get_tile(self, xyz_url, z, x, y):
+    def _get_tile(self, xyz_url, z, x, y):
         self.playground_refresh_access_token()
         try:
             r = requests.get(xyz_url.format(z=z, x=x, y=y), headers=self.HEADERS)
@@ -285,7 +297,7 @@ class PlaygroundClient(object):
         return None    
     
     @staticmethod
-    def emptyQueue(q):
+    def _emptyQueue(q):
         while True:
             q.task_done()
             args = q.get()
@@ -293,7 +305,9 @@ class PlaygroundClient(object):
                 break
 
     # multithreaded functions to get multiple XYZ tiles and combine them into a large tile
-    def get_big_tile(self, nbtiles, xyz_url, zoom, col, row, num_worker_threads = 8):
+    def get_big_tile(self, imageUId, nbtiles, zoom, col, row, num_worker_threads = 8):
+
+        xyz_url = self.get_image_xyz(imageUId)
         big_tile = Image.new(IMG_MODE, (IMG_SIDE * nbtiles, IMG_SIDE * nbtiles))
         offset = nbtiles // 2
 
@@ -313,7 +327,7 @@ class PlaygroundClient(object):
                 c = col - offset + i
                 r = row - offset + j
                 try:
-                    img = self.get_tile(xyz_url, zoom, c, r)
+                    img = self._get_tile(xyz_url, zoom, c, r)
                 except (NetException, TileException) as e:
                     print("Catched an error: " + str(e))
                     if counter < max_retries:
@@ -323,10 +337,10 @@ class PlaygroundClient(object):
                         continue
                     else:
                         # there is an error and we've tried enough times
-                        emptyQueue(q)
+                        PlaygroundClient._emptyQueue(q)
                         raise e
                 except (PlaygroundClientError) as e:
-                        emptyQueue(q)
+                        PlaygroundClient._emptyQueue(q)
                         raise e
                 finally:
                     q.task_done()
