@@ -6,8 +6,10 @@ __pycache__/
 # C extensions
 *.so
 
-# OneAtlas API Key
+# OneAtlas API Key and other stuff
 *.txt
+Dockerfile.gpu
+run_docker.sh
 ZZ*
 
 # Legacy

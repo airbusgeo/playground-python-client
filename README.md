@@ -28,6 +28,13 @@ Make sure to keep your **api_key.txt** safe! Do not include it in a public githu
 
 The following script will then use this **api_key.txt** file to generate an ACCESS_TOKEN. We will store this ACCESS_TOKEN in HEADERS that we will send with each requests. The ACCESS_TOKEN has a timeout so we will create a function that renew the ACCESS_TOKEN when half of the timeout has expired. 
 
+### Run the examples in Jupyter Notebook from Docker container (optional)
+
+You can run the **Jupyter Notebook** examples to get familiar with the Playground Client. If you do not have a running Jupyter environment, you can run **Jupyter Lab** with the help of the **Docker** file that we provide. Just run the following command `./run_docker.sh --build` to create and run the container. After the Docker image has been built, you just need to run `./run_docker.sh`.
+
+When the container is running, just open your browser and navigate to http://localhost:8080. The password is `password`.
+
+
 ## How to create the Playground Client in your Python scripts
 
 Just import and create an instance of the PlaygroundClient object:
