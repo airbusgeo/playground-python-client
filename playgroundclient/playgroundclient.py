@@ -109,6 +109,7 @@ class PlaygroundClient(object):
     
     def _get_request(self, template, format='json', **kwargs):
         self.playground_refresh_access_token()
+        self.HEADERS.pop('Content-Type', None)
         r = requests.get(template.format(**kwargs), headers=self.HEADERS)
         if r.status_code >= 200 and r.status_code < 300:
             return r.json() if format == 'json' else r.text
@@ -122,7 +123,8 @@ class PlaygroundClient(object):
 
     def _post_request(self, template, payload, format='json', **kwargs):
         self.playground_refresh_access_token()
-        r = requests.post(template.format(**kwargs), data=payload, headers=self.HEADERS.update({'Content-Type': 'application/json'}))
+        self.HEADERS.update({'Content-Type': 'application/json'})
+        r = requests.post(template.format(**kwargs), data=payload, headers=self.HEADERS)
         if r.status_code >= 200 and r.status_code < 300:
             return r.json() if format == 'json' else r.text
         elif r.status_code == 404:
@@ -135,7 +137,8 @@ class PlaygroundClient(object):
 
     def _put_request(self, template, payload, format='json', **kwargs):
         self.playground_refresh_access_token()
-        r = requests.put(template.format(**kwargs), data=payload, headers=self.HEADERS.update({'Content-Type': 'application/json'}))
+        self.HEADERS.update({'Content-Type': 'application/json'})
+        r = requests.put(template.format(**kwargs), data=payload, headers=self.HEADERS)
         if r.status_code >= 200 and r.status_code < 300:
             return r.json() if format == 'json' else r.text
         elif r.status_code == 404:
@@ -148,6 +151,7 @@ class PlaygroundClient(object):
 
     def _delete_request(self, template, format='json', **kwargs):
         self.playground_refresh_access_token()
+        self.HEADERS.pop('Content-Type', None)
         r = requests.delete(template.format(**kwargs), headers=self.HEADERS)
         if r.status_code >= 200 and r.status_code < 300:
             return True
