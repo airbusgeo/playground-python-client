@@ -302,7 +302,7 @@ class PlaygroundClient(object):
         if r.status_code == 200:
             return Image.open(BytesIO(r.content))
         elif r.status_code == 404 or r.status_code == 204:
-            return Image.new(IMG_MODE, (IMG_SIDE, IMG_SIDE), "black")
+            return Image.new(self.IMG_MODE, (self.IMG_SIDE, self.IMG_SIDE), "black")
         elif r.status_code == 401 or r.status_code == 403:
             raise PlaygroundClientError(r.status_code, 'You do not have sufficient rights to perform this operation.')
         elif r.status_code >= 500 and r.status_code <= 504:

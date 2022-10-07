@@ -26,7 +26,7 @@ setup(
     long_description='A Python client and CLI to interact with the Airbus Intelligence Playground API.',
     include_package_data=True,
     author='Jeff Faudi',
-    author_email='jean-francois.faudi@airbus.com',
+    author_email='jeffaudi@gmail.com',
     license='LICENSE',
     install_requires=REQUIRED_PACKAGES,
     python_requires='>=3.6',

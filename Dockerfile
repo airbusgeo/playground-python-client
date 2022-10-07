@@ -58,7 +58,7 @@ RUN add-apt-repository -y ppa:ubuntugis/ppa && \
 
 # Get NodeJS
 RUN curl -sL https://deb.nodesource.com/setup_14.x | bash - && apt-get install -y nodejs
-RUN nodejs -v
+RUN node -v
 
 RUN ln -sf /usr/bin/python3 /usr/bin/python & \
     ln -sf /usr/bin/pip3 /usr/bin/pip
